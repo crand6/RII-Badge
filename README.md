@@ -144,8 +144,12 @@ trim legs, and enjoy!
 
 ## Acknowledgements
 RJ (crandyman): Concept, circuitry, component selection, badge assembly, software
+
 Frankl: Badge design, graphics, concept support
+
 Joey Villa: Badge assembly
+
 Zack Chapman: Badge assembly
+
 curiouspiano: Badge assembly
 

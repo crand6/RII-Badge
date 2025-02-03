@@ -52,9 +52,8 @@ The high-level workflow to modify your badge follows:
 - Come to the RII booth to flash your badge with our PICKit3.
 
 ### Install the IDE
-Install the MPLAB X IDE using an installer mirrored in this repo (or download
-it directly from Microchip at
-https://www.microchip.com/en-us/tools-resources/develop/mplab-x-ide). You only
+Install the MPLAB X IDE using an installer from Microchip at
+https://www.microchip.com/en-us/tools-resources/develop/mplab-x-ide. You only
 need support for the 8-bit microcontrollers (XC8) and should only need the IDE
 and not the IPE.
 

@@ -23,9 +23,10 @@
 #define B_LOWER_LEFT (0x1 << 4)
 #define B_BOTTOM_LEFT (0x1 << 5)
 
-// Delays
-#define SHORT_FLASH 1600
-#define LONG_FLASH 4000
+
+// Flash Delays
+#define FAST_FLASH 1600
+#define SLOW_FLASH 4000
 
 unsigned short i = 0;
 unsigned short delay_i = 0;
@@ -64,15 +65,14 @@ void main(void) {
     while (1) {
         // First flash group
         flash(5, SHORT_FLASH);
-        delay(LONG_DELAY);
-        //do_it();
+        delay(FAST_FLASH);
         
         // Second flash group
-        flash(3, LONG_FLASH);
+        flash(3, SLOW_FLASH);
         
         // Last flash group
-        flash(5, SHORT_FLASH);
-        delay(LONG_DELAY * 2);
+        flash(5, FAST_FLASH);
+        delay(SLOW_FLASH * 2);
     }
     
     // Should never reach

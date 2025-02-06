@@ -18,6 +18,8 @@ Additionally, as the text on the badge indicates, you can unlock a new light
 pattern on your badge by reverse engineering the code on the PIC16. Contact the
 RII booth to get an Intel HEX representation of your badge's code.
 
+![](./images/badge.jpg)
+
 ## Why this badge?
 In addition to our cutting-edge program work, RII has a culture of growth and
 [mentoring](https://www.researchinnovations.com/post/mentoriing-mentality). Our

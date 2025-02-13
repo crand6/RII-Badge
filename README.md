@@ -59,17 +59,20 @@ https://www.microchip.com/en-us/tools-resources/develop/mplab-x-ide. You only
 need support for the 8-bit microcontrollers (XC8) and should only need the IDE
 and not the IPE.
 
-### Set up configuration options
-If you are writing C code, you want the XC8 compiler.  If you are writing
-assembly, you want the pic-as assembler.
+### Make a new project
+- Choose the "Microchip Embedded" Category and "Application Project(s)" Project
+- Select "Baseline 8-bit MCUs" as the family and the "PIC16F54" as the Device
+- For development, you can ignore the "Tool" option.
+- If you are writing C code, you want the XC8 compiler.  If you are writing
+  assembly, you want the pic-as assembler.
+- Name project as you desire, click finish
 
-Select the "PICkit 3" as your "connected hardware tool" (you'll need to select
-"Show All" if the PICkit is not attached to your computer) In the PICkit 3
-menu, select the "Power" option category. Enable "power target circuit from
-PICkit3" and set voltage level to 3.5V.
-
-In your source code, you'll need to set the configuration bits. You want WDT
-Disabled, Code Protection disabled, and the oscillator set to RC.
+### Editing source code
+- Right click "Source Files"->"New"->"main.c"
+- Replace the contents of main.c with the main.c in this repo
+- In your source code, you'll need to set the configuration bits. You want WDT
+  Disabled, Code Protection disabled, and the oscillator set to RC. This is
+  already done using "#pragma" statements in the provided code.
 
 
 ### Write code
@@ -86,6 +89,11 @@ to reduce size, and you can write more compact code using assembly instead of
 C.
 
 ### Flash badge
+Select the "PICkit 3" as your "connected hardware tool" (you'll need to select
+"Show All" if the PICkit is not attached to your computer) In the PICkit 3
+menu, select the "Power" option category. Enable "power target circuit from
+PICkit3" and set voltage level to 3.5V.
+
 Connect a PICkit 3 to the 5-pin ICSP header and click "make and program device
 main project". We leave the details of this as an exercise to the reader.
 

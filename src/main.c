@@ -64,8 +64,8 @@ void main(void) {
     
     while (1) {
         // First flash group
-        flash(5, SHORT_FLASH);
-        delay(FAST_FLASH);
+        flash(5, FAST_FLASH);
+        delay(SLOW_FLASH);
         
         // Second flash group
         flash(3, SLOW_FLASH);
@@ -78,4 +78,3 @@ void main(void) {
     // Should never reach
     return;
 }
-#endif

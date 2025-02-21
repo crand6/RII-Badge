@@ -1,9 +1,8 @@
 # RII badge
-This is the public repo accompanying the Research Innovations Incorporated
-(RII) badge, debuting at the RE//verse Conference 2025. Because RII is
-providing the badges fully assembled, assembly instructions are located at the
-bottom of the README for anyone interested (or anyone building from a provided
-kit in the future).
+This is the repo accompanying the Research Innovations Incorporated (RII)
+badge, debuting at RE//verse 2025. Because RII is providing the badges fully
+assembled, assembly instructions are located at the bottom of the README for
+anyone interested (or anyone building from a provided kit in the future).
 
 This README prioritizes features of the badge and how to modify it. By picking
 up a badge from the RII booth, you agree to make a good-faith effort to

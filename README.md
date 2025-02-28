@@ -17,6 +17,10 @@ Additionally, as the text on the badge indicates, you can unlock a new light
 pattern on your badge by reverse engineering the code on the PIC16. Contact the
 RII booth to get an Intel HEX representation of your badge's code.
 
+> **_NOTE:_** The LEDs are very bright! Please be respectful and avoid pointing
+lights directly into others' eyes. Ensure your badges are not a distraction to
+RE//verse speakers, especially if you are in the front section of seating.
+
 ![](./images/badge.jpg)
 
 ## Why this badge?

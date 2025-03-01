@@ -274,8 +274,10 @@ class PIC16F54View(BinaryView):
         entry_point_address = 0x1ff * 2
         self.add_entry_point(entry_point_address)
         entry_point_function = self.get_function_at(entry_point_address)
+        undo_id = self.file.begin_undo_actions()
         entry_point_function.name = "RESET VECTOR"
         entry_point_function.set_comment_at(0x1ff * 2, "If PC goes >= 0x400, it rolls over to 0x0 and continues executing from there")
+        self.file.forget_undo_actions(undo_id)
 
         # Address 0 is code if PC wraps around from 0x1ff -> 0x0
         self.add_function(0x0)

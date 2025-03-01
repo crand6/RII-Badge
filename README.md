@@ -126,14 +126,15 @@ you have questions or need ideas.
 Tips for assembling the badge follow.
 
 ### Kit contents
-1x  PIC16F54 microcontroller
-1x  10k ohm resistor
-1x  200 microfarad capacitor
-1x  CR2032 battery
-1x  Battery mount
-1x  5-pin header
-1x  Switch
-10x LEDs
+* 1x  PIC16F54 microcontroller
+* 1x  10k ohm resistor
+* 1x  200 picofarad capacitor
+* 2x  3.7k ohm resistors
+* 1x  CR2032 battery
+* 1x  Battery mount
+* 1x  5-pin header
+* 1x  Switch
+* 10x LEDs
 
 ### Recommended assembly order
 It's easiest to assemble a PCB on a flat surface. Save the LEDs as the last

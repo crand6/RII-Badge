@@ -1,5 +1,6 @@
 import re
 
+import binaryninja
 from binaryninja.architecture import (
     Architecture,
     BranchType,
@@ -9,11 +10,10 @@ from binaryninja.architecture import (
     RegisterInfo,
 )
 from binaryninja.binaryview import BinaryView, SegmentFlag, SymbolType
-from binaryninja import log_warn, Symbol
+from binaryninja import log_info, log_warn, Symbol
 from binaryninja import (
     FlagRole,
     LowLevelILFlagCondition,
-    IntrinsicInfo,
 )
 from typing import List, Optional
 
@@ -21,13 +21,16 @@ from typing import List, Optional
 class PIC16F54Disassembler:
     def __init__(self):
         self.SFRs = ["INDF", "TMR0", "PCL", "STATUS", "FSR", "PORTA", "PORTB"]
+        self.GPRs = []
         for i in range(25):
-            self.SFRs.append(f"GPR{i}")
+            self.GPRs.append(f"GPR{i}")
+        self.TRISs = ["TRISA", "TRISB"]
+        self.memory_mapped_regs = self.SFRs + self.GPRs + self.TRISs
 
     def _disasm_f(self, data: int, addr: int):
         # f is one of the Special Function Registers (SFR)
         # So let's just return the text of it
-        return self.SFRs[data & 0b1_1111]
+        return self.memory_mapped_regs[data & 0b1_1111]
 
     def _disasm_k(self, data: int, addr: int):
         return data & 0b1111_1111
@@ -179,30 +182,15 @@ class PIC16F54(Architecture):
     instr_alignment = 2
     max_instr_length = 2
 
-    #    regs = {
-    #        "W": RegisterInfo("W", 1),
-    #        # Hardware stack registers, 9-bits wide each
-    #        "S1": RegisterInfo("S1", 2),
-    #        "S2": RegisterInfo("S2", 2),
-    #        # Flags is in STATUS SFR in memory, not a separate flags register
-    #    }
-
     regs = {
-        "INDF": RegisterInfo("INDF", 1),
-        "TMR0": RegisterInfo("TMR0", 1),
-        "PCL": RegisterInfo("PCL", 1),
-        "STATUS": RegisterInfo("STATUS", 1),
-        "FSR": RegisterInfo("FSR", 1),
-        "PORTA": RegisterInfo("PORTA", 1),
-        "PORTB": RegisterInfo("PORTB", 1),
+        "W": RegisterInfo("W", 1),
+        # Hardware stack registers, 9-bits wide each
+        "S1": RegisterInfo("S1", 2),
+        "S2": RegisterInfo("S2", 2),
+        # Flags is in STATUS SFR in memory, not a separate flags register
     }
-    regs.update({f"GPR{i}": RegisterInfo(f"GPR{i}", 1) for i in range(25)})
-    regs["W"] = RegisterInfo("W", 1)
-    # Hardware stack registers, 9-bits wide each
-    regs["S1"] = RegisterInfo("S1", 2)
-    regs["S2"] = RegisterInfo("S2", 2)
 
-    stack_pointer = "S1"
+    # stack_pointer = "S1"
     flags = ["C", "DC", "Z", "PD", "TO", "PA0", "PA1", "PA2"]
     flag_roles = {
         "C": FlagRole.CarryFlagRole,
@@ -221,7 +209,6 @@ class PIC16F54(Architecture):
     flag_write_types = ["", "*", "c", "z"]
 
     flags_written_by_flag_write_type = {"c": ["C", "DC", "Z"], "z": ["Z"]}
-    intrinsics = {"read_input": IntrinsicInfo([], [])}
 
     def __init__(self):
         super().__init__()
@@ -300,8 +287,8 @@ class PIC16F54(Architecture):
                         InstructionTextTokenType.OperandSeparatorToken, atom
                     )
                 )
-            elif atom in self.PIC16F54Disassembler.SFRs:
-                value = 0x500 + self.PIC16F54Disassembler.SFRs.index(atom)
+            elif atom in self.PIC16F54Disassembler.memory_mapped_regs:
+                value = 0x500 + self.PIC16F54Disassembler.memory_mapped_regs.index(atom)
                 result.append(
                     InstructionTextToken(
                         InstructionTextTokenType.PossibleAddressToken,
@@ -333,7 +320,18 @@ class PIC16F54(Architecture):
         )
         atoms = instruction_text.split()
         if atoms[0] == "CLRF":
-            il.append(il.set_reg(size=1, reg=atoms[1], value=il.const(1, 0), flags="z"))
+            il.append(
+                il.store(
+                    size=1,
+                    addr=il.const(
+                        2,
+                        0x500
+                        + self.PIC16F54Disassembler.memory_mapped_regs.index(atoms[1]),
+                    ),
+                    value=il.const(1, 0),
+                    flags="z",
+                )
+            )
         elif atoms[0] == "CLRW":
             il.append(il.set_reg(size=1, reg="W", value=il.const(1, 0), flags="z"))
         elif atoms[0] == "CALL":
@@ -346,19 +344,53 @@ class PIC16F54(Architecture):
                 il.append(il.jump(il.const(2, dest)))
         elif atoms[0] == "RETLW":
             il.append(il.set_reg(size=1, reg="W", value=il.const(1, int(atoms[1]))))
-            il.append(il.ret(il.pop(2)))
+            il.append(il.ret(0))
         elif atoms[0] == "MOVLW":
             il.append(il.set_reg(size=1, reg="W", value=il.const(1, int(atoms[1]))))
         elif atoms[0] == "MOVWF":
-            il.append(il.set_reg(size=1, reg=atoms[1], value=il.reg(size=1, reg="W")))
+            il.append(
+                il.store(
+                    size=1,
+                    addr=il.const(
+                        2,
+                        0x500
+                        + self.PIC16F54Disassembler.memory_mapped_regs.index(atoms[1]),
+                    ),
+                    value=il.reg(size=1, reg="W"),
+                )
+            )
         elif atoms[0] == "SUBWF":
             operation = il.sub(
-                1, il.reg(size=1, reg=atoms[1][:-1]), il.reg(size=1, reg="W"), flags="c"
+                size=1,
+                a=il.load(
+                    size=1,
+                    addr=il.const(
+                        2,
+                        0x500
+                        + self.PIC16F54Disassembler.memory_mapped_regs.index(
+                            atoms[1][:-1]
+                        ),
+                    ),
+                ),
+                b=il.reg(size=1, reg="W"),
+                flags="cz",
             )
             if atoms[-1][-1] == "W":
                 il.append(il.set_reg(size=1, reg="W", value=operation))
             else:
-                il.append(il.set_reg(size=1, reg=atoms[1], value=operation))
+                il.append(
+                    il.store(
+                        size=1,
+                        addr=il.const(
+                            2,
+                            0x500
+                            + self.PIC16F54Disassembler.memory_mapped_regs.index(
+                                atoms[1]
+                            ),
+                        ),
+                        value=operation,
+                    )
+                )
 
             # next_label = il.LowLevelILLabel()
             # or_label = il.LowLevelILLabel()
@@ -369,51 +401,132 @@ class PIC16F54(Architecture):
             # il.store(1, il.const(2, STATUS), il.load(1, STATUS))
         elif atoms[0] == "ADDWF":
             operation = il.add(
-                1, il.reg(size=1, reg=atoms[1][:-1]), il.reg(size=1, reg="W"), flags="c"
+                1,
+                il.load(
+                    size=1,
+                    addr=il.const(
+                        2,
+                        0x500
+                        + self.PIC16F54Disassembler.memory_mapped_regs.index(
+                            atoms[1][:-1]
+                        ),
+                    ),
+                ),
+                il.reg(size=1, reg="W"),
+                flags="cz",
             )
             if atoms[-1][-1] == "W":
                 il.append(il.set_reg(size=1, reg="W", value=operation))
             else:
-                il.append(il.set_reg(size=1, reg=atoms[1][:-1], value=operation))
+                il.append(
+                    il.store(
+                        size=1,
+                        addr=il.const(
+                            2,
+                            0x500
+                            + self.PIC16F54Disassembler.memory_mapped_regs.index(
+                                atoms[1][:-1]
+                            ),
+                        ),
+                        value=operation,
+                    )
+                )
         elif atoms[0] == "ANDWF":
             operation = il.and_expr(
-                il.reg(size=1, reg=atoms[1][:-1]), il.reg(size=1, reg="W"), flags="z"
+                il.load(
+                    size=1,
+                    addr=il.const(
+                        2,
+                        0x500
+                        + self.PIC16F54Disassembler.memory_mapped_regs.index(
+                            atoms[1][:-1]
+                        ),
+                    ),
+                ),
+                il.reg(size=1, reg="W"),
+                flags="z",
             )
             if atoms[-1][-1] == "W":
                 il.append(il.set_reg(size=1, reg="W", value=operation))
             else:
-                il.append(il.set_reg(size=1, reg=atoms[1][:-1], value=operation))
+                il.append(
+                    il.store(
+                        size=1,
+                        addr=il.const(
+                            2,
+                            0x500
+                            + self.PIC16F54Disassembler.memory_mapped_regs.index(
+                                atoms[1][:-1]
+                            ),
+                        ),
+                        value=operation,
+                    )
+                )
         elif atoms[0] == "MOVF":
             if atoms[-1][-1] == "W":
-                if atoms[1][:-1] == "PORTB":
-                    il.append(
-                        il.intrinsic(
-                            outputs=["PORTB"], intrinsic="read_input", params=[]
-                        )
-                    )
                 il.append(
                     il.set_reg(
                         size=1,
                         reg="W",
-                        value=il.reg(size=1, reg=atoms[1][:-1]),
+                        value=il.load(
+                            size=1,
+                            addr=il.const(
+                                2,
+                                0x500
+                                + self.PIC16F54Disassembler.memory_mapped_regs.index(
+                                    atoms[1][:-1]
+                                ),
+                            ),
+                        ),
                         flags="z",
                     )
                 )
             else:
                 il.append(
-                    il.set_reg(
+                    il.store(
                         size=1,
-                        reg=atoms[1][:-1],
+                        addr=il.const(
+                            2,
+                            0x500
+                            + self.PIC16F54Disassembler.memory_mapped_regs.index(
+                                atoms[1][:-1]
+                            ),
+                        ),
                         value=il.reg(size=1, reg="W"),
                         flags="z",
                     )
                 )
         elif atoms[0] == "COMF":
-            result = il.not_expr(1, il.reg(size=1, reg=atoms[1][:-1]), flags="z")
+            result = il.not_expr(
+                1,
+                il.load(
+                    size=1,
+                    addr=il.const(
+                        2,
+                        0x500
+                        + self.PIC16F54Disassembler.memory_mapped_regs.index(
+                            atoms[1][:-1]
+                        ),
+                    ),
+                ),
+                flags="z",
+            )
             if atoms[-1][-1] == "W":
                 il.append(il.set_reg(size=1, reg="W", value=result))
             else:
-                il.append(il.set_reg(size=1, reg=atoms[1][:-1], value=result))
+                il.append(
+                    il.store(
+                        size=1,
+                        addr=il.const(
+                            2,
+                            0x500
+                            + self.PIC16F54Disassembler.memory_mapped_regs.index(
+                                atoms[1][:-1]
+                            ),
+                        ),
+                        value=result,
+                    )
+                )
         elif atoms[0] == "ANDLW":
             il.append(
                 il.set_reg(
@@ -429,20 +542,59 @@ class PIC16F54(Architecture):
             )
         elif atoms[0] == "INCF":
             result = il.add(
-                1, il.reg(size=1, reg=atoms[1][:-1]), il.const(1, 1), flags="z"
+                1,
+                il.load(
+                    size=1,
+                    addr=il.const(
+                        2,
+                        0x500
+                        + self.PIC16F54Disassembler.memory_mapped_regs.index(
+                            atoms[1][:-1]
+                        ),
+                    ),
+                ),
+                il.const(1, 1),
+                flags="z",
             )
             if atoms[-1][-1] == "F":
-                il.append(il.set_reg(size=1, reg=atoms[1][:-1], value=result))
+                il.append(
+                    il.store(
+                        size=1,
+                        addr=il.const(
+                            2,
+                            0x500
+                            + self.PIC16F54Disassembler.memory_mapped_regs.index(
+                                atoms[1][:-1]
+                            ),
+                        ),
+                        value=result,
+                    )
+                )
             else:
                 il.append(il.set_reg(size=1, reg="W", value=result))
         elif atoms[0] == "BSF":
             value = atoms[1][:-1]
             il.append(
-                il.set_reg(
+                il.store(
                     size=1,
-                    reg=value,
+                    addr=il.const(
+                        2,
+                        0x500
+                        + self.PIC16F54Disassembler.memory_mapped_regs.index(value),
+                    ),
                     value=il.or_expr(
-                        1, il.reg(size=1, reg=value), il.const(1, 1 << int(atoms[-1]))
+                        1,
+                        il.load(
+                            size=1,
+                            addr=il.const(
+                                2,
+                                0x500
+                                + self.PIC16F54Disassembler.memory_mapped_regs.index(
+                                    value
+                                ),
+                            ),
+                        ),
+                        il.const(1, 1 << int(atoms[-1])),
                     ),
                 )
             )
@@ -451,16 +603,41 @@ class PIC16F54(Architecture):
             il.append(
                 il.set_reg(
                     size=1,
-                    reg=value,
+                    addr=il.const(
+                        2,
+                        0x500
+                        + self.PIC16F54Disassembler.memory_mapped_regs.index(value),
+                    ),
                     value=il.and_expr(
                         1,
-                        il.reg(size=1, reg=value),
+                        il.load(
+                            size=1,
+                            addr=il.const(
+                                2,
+                                0x500
+                                + self.PIC16F54Disassembler.memory_mapped_regs.index(
+                                    value
+                                ),
+                            ),
+                        ),
                         il.const(1, ~(1 << int(atoms[-1]))),
                     ),
                 )
             )
         elif atoms[0] == "TRIS":
-            il.append(il.set_reg(size=1, reg=atoms[1], value=il.reg(size=1, reg="W")))
+            il.append(
+                il.store(
+                    size=1,
+                    addr=il.const(
+                        2,
+                        0x500
+                        + self.PIC16F54Disassembler.memory_mapped_regs.index(
+                            "TRIS" + atoms[1][-1]
+                        ),
+                    ),
+                    value=il.reg(size=1, reg="W"),
+                )
+            )
         elif atoms[0] in ["BTFSS", "BTFSC"]:
             bit = int(atoms[-1])
             cond = None
@@ -470,11 +647,20 @@ class PIC16F54(Architecture):
                 elif bit == 2:
                     cond = il.flag("Z")
                 else:
-                    print(f"Checking for bit {bit}")
+                    log_warn(f"Checking for bit {bit}")
                     cond = None
 
             if cond is None:
-                il_val = il.reg(size=1, reg=atoms[1][:-1])
+                il_val = il.load(
+                    size=1,
+                    addr=il.const(
+                        2,
+                        0x500
+                        + self.PIC16F54Disassembler.memory_mapped_regs.index(
+                            atoms[1][:-1]
+                        ),
+                    ),
+                )
                 cond = il.and_expr(1, il_val, il.const(1, 1 << bit))
 
             skip_label = il.get_label_for_address(Architecture["PIC16F54"], addr + 4)
@@ -524,7 +710,7 @@ class PIC16F54View(BinaryView):
         # is not backed by data from our provided Intel HEX dump
         self.add_auto_segment(
             0x500,
-            0x20,
+            0x22,
             0x0,
             0x0,
             SegmentFlag.SegmentReadable | SegmentFlag.SegmentWritable,
@@ -533,11 +719,10 @@ class PIC16F54View(BinaryView):
         # Similar with the two level hardware stack. Let's just make a fake segment to hold it
         # self.add_auto_segment(0x600, 0x4, 0x0, 0x0, SegmentFlag.SegmentReadable | SegmentFlag.SegmentWritable)
 
-        # Define all the SFRs
-        for index, sfr in enumerate(self.disassembler.SFRs):
-            self.define_auto_symbol_and_var_or_function(
-                Symbol(SymbolType.DataSymbol, 0x500 + index, sfr),
-                self.parse_type_string("char")[0],
+        # Define all the memory mapped registers
+        for index, mmr in enumerate(self.disassembler.memory_mapped_regs):
+            self.define_auto_symbol(
+                Symbol(SymbolType.DataSymbol, 0x500 + index, mmr),
             )
 
         # Set the entry point and a comment explaining the PC rollover

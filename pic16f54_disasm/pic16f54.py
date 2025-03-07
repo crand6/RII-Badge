@@ -190,25 +190,29 @@ class PIC16F54(Architecture):
         # Flags is in STATUS SFR in memory, not a separate flags register
     }
 
-    # stack_pointer = "S1"
+    stack_pointer = "S1"
     flags = ["C", "DC", "Z", "PD", "TO", "PA0", "PA1", "PA2"]
     flag_roles = {
         "C": FlagRole.CarryFlagRole,
-        "DC": FlagRole.CarryFlagRole,
+        "DC": FlagRole.HalfCarryFlagRole,
         "Z": FlagRole.ZeroFlagRole,
-        #'v': FlagRole.OverflowFlagRole
+        "TO": FlagRole.SpecialFlagRole,
+        "PD": FlagRole.SpecialFlagRole,
     }
+    flag_write_types = ["", "c", "z", "cz", "topd"]
+
+    flags_written_by_flag_write_type = {
+        "": [],
+        "c": ["C"],
+        "z": ["Z"],
+        "cz": ["C", "DC", "Z"],
+        "topd": ["TO", "PD"]
+    }
+
     flags_required_for_flag_condition = {
         LowLevelILFlagCondition.LLFC_E: ["Z"],
-        LowLevelILFlagCondition.LLFC_NE: ["Z"],
-        # LowLevelILFlagCondition.LLFC_UGE: ['C', 'DC'],
-        LowLevelILFlagCondition.LLFC_O: ["C", "DC"],
-        # LowLevelILFlagCondition.LLFC_NEG: ['n'],
-        # LowLevelILFlagCondition.LLFC_POS: ['n']
+        LowLevelILFlagCondition.LLFC_UGT: ['C'],
     }
-    flag_write_types = ["", "*", "c", "z"]
-
-    flags_written_by_flag_write_type = {"c": ["C", "DC", "Z"], "z": ["Z"]}
 
     def __init__(self):
         super().__init__()
@@ -344,7 +348,7 @@ class PIC16F54(Architecture):
                 il.append(il.jump(il.const(2, dest)))
         elif atoms[0] == "RETLW":
             il.append(il.set_reg(size=1, reg="W", value=il.const(1, int(atoms[1]))))
-            il.append(il.ret(0))
+            il.append(il.ret(il.pop(0)))
         elif atoms[0] == "MOVLW":
             il.append(il.set_reg(size=1, reg="W", value=il.const(1, int(atoms[1]))))
         elif atoms[0] == "MOVWF":
@@ -679,6 +683,7 @@ class PIC16F54(Architecture):
                     value=il.xor_expr(
                         1, il.reg(size=1, reg="W"), il.const(1, int(atoms[1]))
                     ),
+                    flags="z"
                 )
             )
         else:
